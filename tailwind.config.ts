@@ -39,6 +39,10 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -57,6 +61,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      backgroundImage: {
+        'gradient-emergency': 'var(--gradient-emergency)',
+        'gradient-safe': 'var(--gradient-safe)',
+        'gradient-alert': 'var(--gradient-alert)',
+      },
+      boxShadow: {
+        'emergency': 'var(--shadow-emergency)',
+        'safe': 'var(--shadow-safe)',
       },
       borderRadius: {
         lg: "var(--radius)",
