@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Shield, LogOut, Home, Activity, Map } from 'lucide-react';
+import { Shield, LogOut, Home, Activity, Map, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const Navigation = () => {
@@ -31,12 +31,20 @@ export const Navigation = () => {
           </Link>
           
           {userRole === 'citizen' && (
-            <Link to="/citizen">
-              <Button variant="ghost" size="sm">
-                <Activity className="w-4 h-4 mr-2" />
-                Dashboard
-              </Button>
-            </Link>
+            <>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="sm">
+                  <Activity className="w-4 h-4 mr-2" />
+                  Contacts
+                </Button>
+              </Link>
+              <Link to="/citizen">
+                <Button variant="ghost" size="sm">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Send SOS
+                </Button>
+              </Link>
+            </>
           )}
           
           {(userRole === 'responder' || userRole === 'admin') && (

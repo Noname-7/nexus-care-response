@@ -1,10 +1,34 @@
 import { useState, useEffect } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MapPin, AlertCircle, TrendingUp, Users } from 'lucide-react';
+import { MapPin, AlertCircle, TrendingUp, Users, Mail, Phone, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface UserWithProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  phone: string;
+  role: string;
+}
+
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+}
 
 const Admin = () => {
   const [stats, setStats] = useState({
@@ -14,8 +38,13 @@ const Admin = () => {
     averageResponseTime: 'N/A',
   });
   const [heatmapData, setHeatmapData] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserWithProfile[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserWithProfile | null>(null);
+  const [userContacts, setUserContacts] = useState<Contact[]>([]);
+  const [showContactsDialog, setShowContactsDialog] = useState(false);
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!user || userRole !== 'admin') {
@@ -25,6 +54,7 @@ const Admin = () => {
 
     fetchStats();
     fetchHeatmapData();
+    fetchUsers();
 
     const channel = supabase
       .channel('admin-updates')
@@ -76,6 +106,60 @@ const Admin = () => {
     if (data) {
       setHeatmapData(data);
     }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      // Fetch profiles with user roles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone');
+
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (profiles && roles) {
+        const usersData = profiles.map(profile => {
+          const userRole = roles.find(r => r.user_id === profile.id);
+          return {
+            id: profile.id,
+            email: profile.id.substring(0, 8) + '...', // Show partial ID as placeholder
+            full_name: profile.full_name || 'N/A',
+            phone: profile.phone || 'N/A',
+            role: userRole?.role || 'citizen',
+          };
+        });
+        setUsers(usersData);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
+  const fetchUserContacts = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      setUserContacts(data || []);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load user contacts',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleViewContacts = (user: UserWithProfile) => {
+    setSelectedUser(user);
+    fetchUserContacts(user.id);
+    setShowContactsDialog(true);
   };
 
   const getTypeColor = (type: string) => {
@@ -209,8 +293,103 @@ const Admin = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Users Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Registered Users
+              </CardTitle>
+              <CardDescription>
+                Manage users and view their emergency contacts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {users.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No users found</p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {users.map((userData) => (
+                      <div
+                        key={userData.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{userData.full_name}</h4>
+                          <div className="flex flex-col gap-1 text-sm text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {userData.email}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {userData.phone}
+                            </span>
+                          </div>
+                          <span className="inline-block mt-2 px-2 py-1 text-xs rounded-full bg-primary/10 text-primary capitalize">
+                            {userData.role}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewContacts(userData)}
+                        >
+                          View Contacts
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
+
+      {/* Contacts Dialog */}
+      <Dialog open={showContactsDialog} onOpenChange={setShowContactsDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Emergency Contacts for {selectedUser?.full_name}
+            </DialogTitle>
+            <DialogDescription>
+              View the emergency contacts saved by this user
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {userContacts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UserX className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No emergency contacts found for this user</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {userContacts.map((contact) => (
+                  <Card key={contact.id}>
+                    <CardContent className="pt-6">
+                      <h4 className="font-semibold text-lg mb-2">{contact.name}</h4>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4" />
+                          <span>{contact.phone}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4" />
+                          <span>{contact.email}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -113,20 +113,45 @@ const Citizen = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.from('emergency_reports').insert([{
+      // Get user's profile for name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user?.id)
+        .single();
+
+      const { data, error } = await supabase.from('emergency_reports').insert([{
         user_id: user?.id,
         emergency_type: emergencyType as any,
         description: description || null,
         latitude: location.latitude,
         longitude: location.longitude,
         status: 'pending' as any,
-      }]);
+      }]).select().single();
 
       if (error) throw error;
 
+      // Notify user's emergency contacts
+      try {
+        await supabase.functions.invoke('notify-contacts', {
+          body: {
+            emergency_id: data.id,
+            emergency_type: emergencyType,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            description,
+            user_id: user?.id,
+            reporter_name: profile?.full_name || 'User',
+          },
+        });
+      } catch (notifyError) {
+        console.error('Error notifying contacts:', notifyError);
+        // Don't fail the whole operation if contact notification fails
+      }
+
       toast({
         title: 'SOS Sent!',
-        description: 'Emergency responders have been notified.',
+        description: 'Emergency responders and your contacts have been notified.',
       });
 
       setEmergencyType('');
